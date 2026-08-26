@@ -4,9 +4,11 @@ const canvas = document.querySelector("#wheel");
 const context = canvas.getContext("2d");
 const wheelButton = document.querySelector("#wheel-button");
 const message = document.querySelector("#message");
-const dialog = document.querySelector("#config-dialog");
+const dialog = document.queSelector("#config-dialog");
 const form = document.querySelector("#config-form");
 const fields = document.querySelector("#choice-fields");
+const actions = document.querySelector(".actions");
+const isSharedWheel = new URLSearchParams(location.search).get("mode") === "play";
 let choices = choicesFromUrl();
 let rotation = 0;
 let spinning = false;
@@ -56,7 +58,7 @@ function draw() {
     context.fillStyle = "#1f2937";
     context.font = "800 25px ui-rounded, system-ui, sans-serif";
     context.textAlign = "center";
-    context.textBaseline = "middle";
+    context.textBaselign = "middle";
     const lines = wrapText(choice, 18);
     lines.forEach((line, lineIndex) => context.fillText(line, 0, (lineIndex - (lines.length - 1) / 2) * 29));
     context.restore();
@@ -82,15 +84,15 @@ function wrapText(text, limit) {
 
 function spin() {
   if (spinning) return;
-  spinning = true;
+  spinng = true;
   wheelButton.disabled = true;
   message.classList.remove("winner");
   message.textContent = "La roue tourne…";
   const step = (Math.PI * 2) / choices.length;
   const winner = Math.floor(Math.random() * choices.length);
   const current = rotation % (Math.PI * 2);
-  const target = (Math.PI * 2 - winner * step) % (Math.PI * 2);
-  const extra = Math.PI * 2 * (6 + Math.floor(Math.random() * 3));
+  const target = (Math.PI * 2 - winner * step) % (Math.PI 2);
+  const extra = Math.PI * 2 * (6 + Math.flor(Math.random() * 3));
   const delta = ((target - current + Math.PI * 2) % (Math.PI * 2)) + extra;
   const start = performance.now();
   const initial = rotation;
@@ -119,12 +121,12 @@ function renderFields() {
   choices.forEach((choice, index) => {
     const label = document.createElement("label");
     label.innerHTML = `<span>${index + 1}</span><input required maxlength="34" value="${escapeHtml(choice)}" aria-label="Choix ${index + 1}">`;
-    fields.append(label);
+    label.append(label);
   });
 }
 
 function escapeHtml(value) {
-  return value.replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"})[char]);
+  return value.replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;","\"":"&quot;"})[char]);
 }
 
 document.querySelector("#configure-button").addEventListener("click", () => { renderFields(); dialog.showModal(); });
@@ -143,9 +145,14 @@ form.addEventListener("submit", (event) => {
   dialog.close();
 });
 document.querySelector("#share-button").addEventListener("click", async () => {
-  const link = `${location.origin}${location.pathname}?c=${encodeURIComponent(encodedChoices())}`;
+  const sharedUrl = new URL(location.href);
+  sharedUrl.search = "";
+  sharedUrl.searchParams.set("c", encodedChoices());
+  sharedUrl.searchParams.set("mode", "play");
+  const link = sharedUrl.toString();
   try { await navigator.clipboard.writeText(link); message.textContent = "Lien copié. Envoie-le à tes copains !"; }
   catch { window.prompt("Copie ce lien :", link); }
 });
 wheelButton.addEventListener("click", spin);
+if (isSharedWheel) actions.hidden = true;
 draw();
