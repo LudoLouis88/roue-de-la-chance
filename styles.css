@@ -1,0 +1,74 @@
+:root {
+  --ink: #1f2937;
+  --muted: #667085;
+  --paper: #fffaf4;
+  --card: rgba(255, 255, 255, 0.76);
+  --line: rgba(31, 41, 55, 0.13);
+  --accent: #f35b50;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--ink);
+  font-family: ui-rounded, "Avenir Next", Avenir, "Nunito Sans", system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 14% 15%, rgba(255, 205, 122, .42), transparent 24rem),
+    radial-gradient(circle at 87% 83%, rgba(255, 157, 140, .28), transparent 26rem),
+    var(--paper);
+}
+
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+.app-shell {
+  width: min(100% - 2rem, 760px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 7vh, 5rem) 0 2.5rem;
+  text-align: center;
+}
+
+.eyebrow { margin: 0 0 .55rem; color: var(--accent); font-size: .72rem; font-weight: 800; letter-spacing: .16em; }
+h1, h2 { margin: 0; font-family: Georgia, "Times New Roman", serif; letter-spacing: -.045em; }
+h1 { font-size: clamp(2.55rem, 7vw, 4.8rem); line-height: .95; }
+h2 { font-size: 2rem; }
+.intro { margin: 1rem 0 0; color: var(--muted); font-size: 1.05rem; }
+
+.wheel-panel { position: relative; width: min(92vw, 580px); margin: clamp(2.5rem, 7vh, 4.4rem) auto 1.6rem; }
+.pointer {
+  position: absolute; z-index: 2; top: -17px; left: 50%; width: 0; height: 0;
+  transform: translateX(-50%);
+  border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 36px solid var(--ink);
+  filter: drop-shadow(0 4px 2px rgba(0,0,0,.15));
+}
+.wheel-button { display: block; width: 100%; padding: 0; border: 0; border-radius: 50%; background: transparent; overflow: hidden; box-shadow: 0 17px 35px rgba(77, 46, 29, .19); transition: transform .16s ease, box-shadow .16s ease; }
+.wheel-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 21px 38px rgba(77, 46, 29, .24); }
+.wheel-button:focus-visible { outline: 4px solid #1f2937; outline-offset: 6px; }
+.wheel-button:disabled { cursor: wait; }
+canvas { display: block; width: 100%; height: auto; }
+.spin-label { position: absolute; inset: 50% auto auto 50%; display: grid; width: 106px; height: 106px; place-items: center; transform: translate(-50%, -50%); border: 7px solid #fffaf4; border-radius: 50%; color: #fff; background: var(--ink); font-size: .82rem; font-weight: 900; letter-spacing: .08em; box-shadow: 0 3px 12px rgba(0,0,0,.2); pointer-events: none; }
+
+.message { min-height: 1.75em; margin: 0; font-size: clamp(1.08rem, 3.3vw, 1.35rem); font-weight: 700; }
+.message.winner { color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .55rem 1.25rem; margin-top: 2rem; }
+.text-button { padding: .45rem .1rem; border: 0; color: var(--ink); background: transparent; text-decoration: underline; text-underline-offset: 4px; font-size: .88rem; font-weight: 700; }
+
+dialog { width: min(calc(100% - 2rem), 580px); max-height: min(90vh, 700px); padding: 0; border: 0; border-radius: 22px; color: var(--ink); background: var(--card); box-shadow: 0 30px 90px rgba(31, 41, 55, .3); backdrop-filter: blur(18px); }
+dialog::backdrop { background: rgba(31, 41, 55, .45); backdrop-filter: blur(5px); }
+dialog form { padding: clamp(1.4rem, 5vw, 2.25rem); overflow: auto; }
+.dialog-header { display: flex; align-items: start; justify-content: space-between; gap: 1rem; text-align: left; }
+.dialog-copy { margin: 1.15rem 0 1.4rem; color: var(--muted); text-align: left; line-height: 1.45; }
+.icon-button { width: 2rem; height: 2rem; border: 0; border-radius: 50%; color: var(--ink); background: rgba(31, 41, 55, .08); font-size: 1.4rem; line-height: 1; }
+.choice-fields { display: grid; gap: .7rem; }
+.choice-fields label { display: grid; grid-template-columns: 2.15rem 1fr; align-items: center; gap: .6rem; text-align: left; font-size: .85rem; font-weight: 800; }
+.choice-fields span { color: var(--muted); }
+.choice-fields input { width: 100%; min-width: 0; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255,255,255,.83); outline-color: var(--accent); }
+.dialog-actions { display: flex; justify-content: space-between; gap: .75rem; margin-top: 1.6rem; }
+.primary-button, .secondary-button { padding: .75rem 1rem; border-radius: 10px; font-weight: 800; }
+.primary-button { border: 0; color: #fff; background: var(--ink); }
+.secondary-button { border: 1px solid var(--line); color: var(--ink); background: transparent; }
+
+@media (max-width: 430px) { .app-shell { width: min(100% - 1.2rem, 760px); } .spin-label { width: 87px; height: 87px; border-width: 5px; font-size: .68rem; } .wheel-panel { margin-top: 3.2rem; } }

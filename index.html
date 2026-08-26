@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111827">
+    <title>La roue de la chance</title>
+    <meta name="description" content="Une roue de la chance à partager.">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <p class="eyebrow">DÉCIDEZ AU HASARD</p>
+        <h1>La roue de la chance</h1>
+        <p class="intro">Un tour, un choix. Bonne chance.</p>
+      </header>
+
+      <section class="wheel-panel" aria-label="Roue de la chance">
+        <div class="pointer" aria-hidden="true"></div>
+        <button id="wheel-button" class="wheel-button" type="button" aria-label="Lancer la roue">
+          <canvas id="wheel" width="700" height="700" aria-label="Roue à sept choix"></canvas>
+          <span class="spin-label">LANCER</span>
+        </button>
+      </section>
+
+      <p id="message" class="message" aria-live="polite">Appuie sur la roue pour lancer le tirage.</p>
+
+      <div class="actions">
+        <button id="configure-button" class="text-button" type="button">Configurer les 7 choix</button>
+        <button id="share-button" class="text-button" type="button">Copier le lien à partager</button>
+      </div>
+    </main>
+
+    <dialog id="config-dialog" aria-labelledby="config-title">
+      <form id="config-form" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">PERSONNALISATION</p>
+            <h2 id="config-title">Tes sept choix</h2>
+          </div>
+          <button class="icon-button" type="button" id="close-dialog" aria-label="Fermer">×</button>
+        </div>
+        <p class="dialog-copy">Renseigne les choix, enregistre, puis copie le lien : tes amis verront exactement cette roue.</p>
+        <div id="choice-fields" class="choice-fields"></div>
+        <div class="dialog-actions">
+          <button class="secondary-button" type="button" id="reset-button">Réinitialiser</button>
+          <button class="primary-button" type="submit">Enregistrer</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
