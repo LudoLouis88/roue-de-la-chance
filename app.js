@@ -4,7 +4,7 @@ const canvas = document.querySelector("#wheel");
 const context = canvas.getContext("2d");
 const wheelButton = document.querySelector("#wheel-button");
 const message = document.querySelector("#message");
-const dialog = document.queSelector("#config-dialog");
+const dialog = document.querySelector("#config-dialog");
 const form = document.querySelector("#config-form");
 const fields = document.querySelector("#choice-fields");
 const actions = document.querySelector(".actions");
@@ -58,7 +58,7 @@ function draw() {
     context.fillStyle = "#1f2937";
     context.font = "800 25px ui-rounded, system-ui, sans-serif";
     context.textAlign = "center";
-    context.textBaselign = "middle";
+    context.textBaseline = "middle";
     const lines = wrapText(choice, 18);
     lines.forEach((line, lineIndex) => context.fillText(line, 0, (lineIndex - (lines.length - 1) / 2) * 29));
     context.restore();
@@ -84,15 +84,15 @@ function wrapText(text, limit) {
 
 function spin() {
   if (spinning) return;
-  spinng = true;
+  spinning = true;
   wheelButton.disabled = true;
   message.classList.remove("winner");
   message.textContent = "La roue tourne…";
   const step = (Math.PI * 2) / choices.length;
   const winner = Math.floor(Math.random() * choices.length);
   const current = rotation % (Math.PI * 2);
-  const target = (Math.PI * 2 - winner * step) % (Math.PI 2);
-  const extra = Math.PI * 2 * (6 + Math.flor(Math.random() * 3));
+  const target = (Math.PI * 2 - winner * step) % (Math.PI * 2);
+  const extra = Math.PI * 2 * (6 + Math.floor(Math.random() * 3));
   const delta = ((target - current + Math.PI * 2) % (Math.PI * 2)) + extra;
   const start = performance.now();
   const initial = rotation;
@@ -121,12 +121,12 @@ function renderFields() {
   choices.forEach((choice, index) => {
     const label = document.createElement("label");
     label.innerHTML = `<span>${index + 1}</span><input required maxlength="34" value="${escapeHtml(choice)}" aria-label="Choix ${index + 1}">`;
-    label.append(label);
+    fields.append(label);
   });
 }
 
 function escapeHtml(value) {
-  return value.replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;","\"":"&quot;"})[char]);
+  return value.replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"})[char]);
 }
 
 document.querySelector("#configure-button").addEventListener("click", () => { renderFields(); dialog.showModal(); });
