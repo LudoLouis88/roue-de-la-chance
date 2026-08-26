@@ -154,5 +154,8 @@ document.querySelector("#share-button").addEventListener("click", async () => {
   catch { window.prompt("Copie ce lien :", link); }
 });
 wheelButton.addEventListener("click", spin);
-if (isSharedWheel) actions.hidden = true;
+if (isSharedWheel) {
+  actions.hidden = true;
+  actions.style.display = "none";
+}
 draw();
