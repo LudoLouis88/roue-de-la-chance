@@ -1,6 +1,12 @@
-FROM nginx:1.27-alpine
+FROM node:22-alpine
 
-COPY --chown=nginx:nginx . /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+COPY app.js index.html package.json server.js styles.css ./
+RUN mkdir -p /data
 
-EXPOSE 80
+ENV PORT=3000
+ENV DATA_DIR=/data
+VOLUME ["/data"]
+EXPOSE 3000
+
+CMD ["node", "server.js"]
