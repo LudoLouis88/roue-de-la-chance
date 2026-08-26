@@ -1,161 +1,95 @@
-const defaults = ["Choix 1", "Choix 2", "Choix 3", "Choix 4", "Choix 5", "Choix 6", "Choix 7"];
 const colors = ["#f45b69", "#f8a75d", "#f6d365", "#86cfa5", "#6cbcc1", "#8d94cf", "#d18ab8"];
 const canvas = document.querySelector("#wheel");
 const context = canvas.getContext("2d");
 const wheelButton = document.querySelector("#wheel-button");
 const message = document.querySelector("#message");
-const dialog = document.querySelector("#config-dialog");
-const form = document.querySelector("#config-form");
-const fields = document.querySelector("#choice-fields");
-const actions = document.querySelector(".actions");
-const isSharedWheel = new URLSearchParams(location.search).get("mode") === "play";
-let choices = choicesFromUrl();
+const adminView = document.querySelector("#admin-view");
+const participantView = document.querySelector("#participant-view");
+const subtitle = document.querySelector("#subtitle");
+const params = new URLSearchParams(location.search);
+let choices = [];
 let rotation = 0;
 let spinning = false;
 
-function choicesFromUrl() {
-  const packed = new URLSearchParams(location.search).get("c");
-  if (!packed) return [...defaults];
-  try {
-    const values = JSON.parse(decodeURIComponent(escape(atob(packed))));
-    return Array.isArray(values) && values.length === 7 && values.every((value) => typeof value === "string" && value.trim())
-      ? values.map((value) => value.trim().slice(0, 34))
-      : [...defaults];
-  } catch { return [...defaults]; }
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
 }
-
-function encodedChoices() {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(choices))));
+async function request(path, options = {}) {
+  const response = await fetch(path, { headers: { "content-type": "application/json" }, ...options });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Une erreur est survenue.");
+  return data;
 }
-
 function draw() {
-  const size = canvas.width;
-  const center = size / 2;
-  const radius = center - 10;
-  const step = (Math.PI * 2) / choices.length;
-  context.clearRect(0, 0, size, size);
-  context.save();
-  context.translate(center, center);
-  context.rotate(rotation - Math.PI / 2 - step / 2);
-
+  const size = canvas.width, center = size / 2, radius = center - 10, step = (Math.PI * 2) / choices.length;
+  context.clearRect(0, 0, size, size); context.save(); context.translate(center, center); context.rotate(rotation - Math.PI / 2 - step / 2);
   choices.forEach((choice, index) => {
     const start = index * step;
-    const end = start + step;
-    context.beginPath();
-    context.moveTo(0, 0);
-    context.arc(0, 0, radius, start, end);
-    context.closePath();
-    context.fillStyle = colors[index];
-    context.fill();
-    context.strokeStyle = "rgba(255,255,255,.9)";
-    context.lineWidth = 5;
-    context.stroke();
-
-    context.save();
-    context.rotate(start + step / 2);
-    context.translate(radius * .60, 0);
-    context.rotate(Math.PI / 2);
-    context.fillStyle = "#1f2937";
-    context.font = "800 25px ui-rounded, system-ui, sans-serif";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    const lines = wrapText(choice, 18);
-    lines.forEach((line, lineIndex) => context.fillText(line, 0, (lineIndex - (lines.length - 1) / 2) * 29));
-    context.restore();
+    context.beginPath(); context.moveTo(0, 0); context.arc(0, 0, radius, start, start + step); context.closePath();
+    context.fillStyle = colors[index]; context.fill(); context.strokeStyle = "rgba(255,255,255,.9)"; context.lineWidth = 5; context.stroke();
+    context.save(); context.rotate(start + step / 2); context.translate(radius * .60, 0); context.rotate(Math.PI / 2);
+    context.fillStyle = "#1f2937"; context.font = "800 25px ui-rounded, system-ui, sans-serif"; context.textAlign = "center"; context.textBaseline = "middle";
+    wrapText(choice, 18).forEach((line, lineIndex, lines) => context.fillText(line, 0, (lineIndex - (lines.length - 1) / 2) * 29)); context.restore();
   });
-  context.restore();
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  context.strokeStyle = "#fffaf4";
-  context.lineWidth = 10;
-  context.stroke();
+  context.restore(); context.beginPath(); context.arc(center, center, radius, 0, Math.PI * 2); context.strokeStyle = "#fffaf4"; context.lineWidth = 10; context.stroke();
 }
-
 function wrapText(text, limit) {
-  const words = text.split(/\s+/);
   const lines = [""];
-  words.forEach((word) => {
-    const candidate = `${lines.at(-1)} ${word}`.trim();
-    if (candidate.length > limit && lines.at(-1)) lines.push(word);
-    else lines[lines.length - 1] = candidate;
-  });
+  text.split(/\s+/).forEach((word) => { const candidate = `${lines.at(-1)} ${word}`.trim(); if (candidate.length > limit && lines.at(-1)) lines.push(word); else lines[lines.length - 1] = candidate; });
   return lines.slice(0, 2);
 }
-
-function spin() {
-  if (spinning) return;
-  spinning = true;
-  wheelButton.disabled = true;
-  message.classList.remove("winner");
-  message.textContent = "La roue tourne…";
-  const step = (Math.PI * 2) / choices.length;
-  const winner = Math.floor(Math.random() * choices.length);
-  const current = rotation % (Math.PI * 2);
-  const target = (Math.PI * 2 - winner * step) % (Math.PI * 2);
-  const extra = Math.PI * 2 * (6 + Math.floor(Math.random() * 3));
-  const delta = ((target - current + Math.PI * 2) % (Math.PI * 2)) + extra;
-  const start = performance.now();
-  const initial = rotation;
-  const duration = 3900;
-
-  function animate(now) {
-    const progress = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 4);
-    rotation = initial + delta * eased;
-    draw();
-    if (progress < 1) requestAnimationFrame(animate);
-    else {
-      rotation = initial + delta;
-      draw();
-      message.textContent = `Le choix est : ${choices[winner]} !`;
-      message.classList.add("winner");
-      wheelButton.disabled = false;
-      spinning = false;
-    }
-  }
-  requestAnimationFrame(animate);
-}
-
-function renderFields() {
-  fields.innerHTML = "";
-  choices.forEach((choice, index) => {
-    const label = document.createElement("label");
-    label.innerHTML = `<span>${index + 1}</span><input required maxlength="34" value="${escapeHtml(choice)}" aria-label="Choix ${index + 1}">`;
-    fields.append(label);
+function spinTo(winner) {
+  const index = choices.indexOf(winner), step = (Math.PI * 2) / choices.length, target = (Math.PI * 2 - index * step) % (Math.PI * 2);
+  const delta = ((target - (rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) + Math.PI * 2 * 7, start = performance.now(), initial = rotation;
+  return new Promise((resolve) => {
+    function animate(now) { const progress = Math.min((now - start) / 3900, 1); rotation = initial + delta * (1 - Math.pow(1 - progress, 4)); draw(); if (progress < 1) requestAnimationFrame(animate); else { rotation = initial + delta; draw(); resolve(); } }
+    requestAnimationFrame(animate);
   });
 }
-
-function escapeHtml(value) {
-  return value.replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"})[char]);
+function choiceInputs(values) {
+  return values.map((choice, index) => `<label><span>${index + 1}</span><input required maxlength="34" value="${escapeHtml(choice)}" aria-label="Choix ${index + 1}">${values.length > 2 ? `<button class="remove-choice" type="button" data-index="${index}" aria-label="Supprimer le choix ${index + 1}">×</button>` : ""}</label>`).join("");
 }
-
-document.querySelector("#configure-button").addEventListener("click", () => { renderFields(); dialog.showModal(); });
-document.querySelector("#close-dialog").addEventListener("click", () => dialog.close());
-document.querySelector("#reset-button").addEventListener("click", () => { choices = [...defaults]; renderFields(); });
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const updated = [...fields.querySelectorAll("input")].map((input) => input.value.trim());
-  if (updated.some((value) => !value)) return;
-  choices = updated;
-  history.replaceState({}, "", `${location.pathname}?c=${encodeURIComponent(encodedChoices())}`);
-  rotation = 0;
-  draw();
-  message.classList.remove("winner");
-  message.textContent = "Ta roue est prête. Copie le lien pour la partager.";
-  dialog.close();
-});
-document.querySelector("#share-button").addEventListener("click", async () => {
-  const sharedUrl = new URL(location.href);
-  sharedUrl.search = "";
-  sharedUrl.searchParams.set("c", encodedChoices());
-  sharedUrl.searchParams.set("mode", "play");
-  const link = sharedUrl.toString();
-  try { await navigator.clipboard.writeText(link); message.textContent = "Lien copié. Envoie-le à tes copains !"; }
-  catch { window.prompt("Copie ce lien :", link); }
-});
-wheelButton.addEventListener("click", spin);
-if (isSharedWheel) {
-  actions.hidden = true;
-  actions.style.display = "none";
+function enableChoiceEditor(root, initial) {
+  let values = [...initial]; const fields = root.querySelector(".choice-fields");
+  function redraw() {
+    fields.innerHTML = choiceInputs(values);
+    fields.querySelectorAll("input").forEach((input, index) => input.addEventListener("input", () => { values[index] = input.value; }));
+    fields.querySelectorAll(".remove-choice").forEach((button) => button.addEventListener("click", () => { values.splice(Number(button.dataset.index), 1); redraw(); }));
+    root.querySelector(".add-choice").disabled = values.length >= 7;
+  }
+  root.querySelector(".add-choice").addEventListener("click", () => { if (values.length < 7) { values.push(`Choix ${values.length + 1}`); redraw(); } }); redraw();
+  return () => values.map((value) => value.trim());
 }
-draw();
+function renderCreate() {
+  adminView.hidden = false;
+  adminView.innerHTML = `<div class="admin-card"><p class="eyebrow">CONSOLE ADMIN</p><h2>Crée ta session</h2><p class="panel-copy">Chaque participant reçoit son propre lien, utilisable une seule fois.</p><form id="create-form"><label class="field-label">Titre <input name="title" maxlength="80" value="La roue de la chance"></label><label class="field-label">Nombre de participants <input name="participantCount" type="number" min="1" max="80" value="4" required></label><p class="field-label">Choix (2 à 7)</p><div class="choice-fields"></div><button class="secondary-button add-choice" type="button">+ Ajouter un choix</button><button class="primary-button full-button" type="submit">Créer la session</button><p class="form-error" aria-live="polite"></p></form></div>`;
+  const form = adminView.querySelector("form"), getChoices = enableChoiceEditor(form, ["Choix 1", "Choix 2"]);
+  form.addEventListener("submit", async (event) => { event.preventDefault(); const error = form.querySelector(".form-error"); error.textContent = ""; try { const data = await request("/api/sessions", { method: "POST", body: JSON.stringify({ title: form.title.value, participantCount: Number(form.participantCount.value), choices: getChoices() }) }); const url = new URL(data.adminUrl); location.assign(`${url.pathname}${url.search}`); } catch (err) { error.textContent = err.message; } });
+}
+function tally(session) { return session.choices.map((choice) => ({ choice, count: session.participants.filter((participant) => participant.result === choice).length })); }
+function renderAdmin(data) {
+  const { session, adminUrl, participantLinks } = data, started = session.participants.some((participant) => participant.result), results = tally(session);
+  adminView.hidden = false; subtitle.textContent = session.title;
+  adminView.innerHTML = `<div class="admin-grid"><section class="admin-card"><p class="eyebrow">CONSOLE ADMIN</p><h2>Ta session</h2><p class="panel-copy">Garde ce lien privé : il donne accès aux résultats et aux liens personnels.</p><div class="admin-link"><input readonly value="${escapeHtml(adminUrl)}"><button class="secondary-button copy-button" data-copy="${escapeHtml(adminUrl)}">Copier mon lien admin</button></div><form id="settings-form" class="settings-form"><label class="field-label">Titre <input name="title" maxlength="80" value="${escapeHtml(session.title)}" ${started ? "disabled" : ""}></label><p class="field-label">Choix (2 à 7)</p><div class="choice-fields"></div><button class="secondary-button add-choice" type="button" ${started ? "disabled" : ""}>+ Ajouter un choix</button>${started ? `<p class="locked-note">Les choix sont verrouillés depuis le premier tirage.</p>` : `<button class="primary-button full-button" type="submit">Enregistrer les choix</button>`}<p class="form-error" aria-live="polite"></p></form></section><section class="admin-card"><p class="eyebrow">RÉSULTATS</p><h2>${session.participants.filter((p) => p.result).length} / ${session.participants.length} ont tiré</h2><div class="result-bars">${results.map((item) => `<div><span>${escapeHtml(item.choice)}</span><strong>${item.count}</strong><i style="width:${session.participants.length ? item.count / session.participants.length * 100 : 0}%"></i></div>`).join("")}</div><button id="reset-round" class="secondary-button full-button" type="button">Démarrer une nouvelle manche</button><p class="reset-copy">Les résultats seront effacés et de nouveaux liens personnels seront générés.</p><h3>Liens participants</h3><div class="participant-links">${participantLinks.map((item, index) => `<article><div><strong>${escapeHtml(item.label)}</strong><small>${session.participants[index].result ? `Résultat : ${escapeHtml(session.participants[index].result)}` : "En attente"}</small></div><button class="text-button copy-button" data-copy="${escapeHtml(item.url)}">Copier le lien</button></article>`).join("")}</div></section></div>`;
+  adminView.querySelectorAll(".copy-button").forEach((button) => button.addEventListener("click", async () => { await navigator.clipboard.writeText(button.dataset.copy); const original = button.textContent; button.textContent = "Copié !"; setTimeout(() => { button.textContent = original; }, 1300); }));
+  adminView.querySelector("#reset-round").addEventListener("click", async () => {
+    if (!window.confirm("Commencer une nouvelle manche ? Les résultats actuels seront effacés et les anciens liens participants ne fonctionneront plus.")) return;
+    try { await request(`/api/sessions/${session.id}/reset?token=${encodeURIComponent(params.get("admin"))}`, { method: "POST" }); await loadAdmin(); }
+    catch (error) { window.alert(error.message); }
+  });
+  if (!started) { const form = adminView.querySelector("#settings-form"), getChoices = enableChoiceEditor(form, session.choices); form.addEventListener("submit", async (event) => { event.preventDefault(); try { await request(`/api/sessions/${session.id}/admin?token=${encodeURIComponent(params.get("admin"))}`, { method: "PUT", body: JSON.stringify({ title: form.title.value, choices: getChoices() }) }); await loadAdmin(); } catch (err) { form.querySelector(".form-error").textContent = err.message; } }); }
+}
+async function loadAdmin() { try { renderAdmin(await request(`/api/sessions/${params.get("session")}/admin?token=${encodeURIComponent(params.get("admin"))}`)); } catch (error) { renderError(error.message); } }
+function renderError(text) { adminView.hidden = false; adminView.innerHTML = `<div class="admin-card"><h2>Oups</h2><p class="panel-copy">${escapeHtml(text)}</p><a class="primary-button" href="/">Créer une nouvelle roue</a></div>`; }
+async function loadParticipant() {
+  try {
+    const sessionId = params.get("session"), participantId = params.get("participant"), data = await request(`/api/sessions/${sessionId}/participant/${participantId}`);
+    participantView.hidden = false; subtitle.textContent = data.title; choices = data.choices; draw(); document.querySelector("#participant-label").textContent = data.participant.label;
+    if (data.participant.result) { wheelButton.disabled = true; message.textContent = `Ton tirage est déjà enregistré : ${data.participant.result}.`; message.classList.add("winner"); return; }
+    message.textContent = "Tu as un seul tirage : appuie quand tu es prêt·e.";
+    wheelButton.addEventListener("click", async () => { if (spinning) return; spinning = true; wheelButton.disabled = true; message.textContent = "La roue tourne…"; try { const result = await request(`/api/sessions/${sessionId}/spin/${participantId}`, { method: "POST" }); await spinTo(result.participant.result); message.textContent = `Ton choix est : ${result.participant.result} !`; message.classList.add("winner"); } catch (error) { message.textContent = error.message; wheelButton.disabled = false; spinning = false; } });
+  } catch (error) { participantView.hidden = false; message.textContent = error.message; }
+}
+if (params.has("admin") && params.has("session")) loadAdmin();
+else if (params.has("participant") && params.has("session")) loadParticipant();
+else renderCreate();
