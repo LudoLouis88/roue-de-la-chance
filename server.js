@@ -17,8 +17,8 @@ const contentTypes = {
 };
 
 function id() { return crypto.randomUUID().replaceAll("-", ""); }
-function send(res, status, payload) {
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+function send(res, status, payload, headers = {}) {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers });
   res.end(JSON.stringify(payload));
 }
 function fail(res, status, message) { send(res, status, { error: message }); }
@@ -60,17 +60,35 @@ function getAdminSession(store, sessionId, token) {
   const session = store.sessions[sessionId];
   return session && crypto.timingSafeEqual(Buffer.from(session.adminToken), Buffer.from(String(token || "").padEnd(session.adminToken.length, " ").slice(0, session.adminToken.length))) ? session : null;
 }
+function getCookies(req) {
+  return Object.fromEntries(String(req.headers.cookie || "").split(";").map((part) => part.trim().split("=")).filter(([key, value]) => key && value).map(([key, value]) => [key, decodeURIComponent(value)]));
+}
+function anonymousCookieName(sessionId) { return `wheel_guest_${sessionId}`; }
+function anonymousLink(req, session) {
+  const protocol = String(req.headers["x-forwarded-proto"] || "http").split(",")[0];
+  const origin = `${protocol}://${req.headers.host}`;
+  return `${origin}/?session=${session.id}&public=${session.publicToken}`;
+}
 function publicSession(session) {
   return {
     id: session.id,
     title: session.title,
     choices: session.choices,
+    mode: session.mode || "individual",
+    participantCount: session.participantCount,
     createdAt: session.createdAt,
     participants: session.participants.map((participant) => ({
       label: participant.label,
       result: participant.result,
       playedAt: participant.playedAt,
     })),
+  };
+}
+function sessionLinks(req, session) {
+  return {
+    adminUrl: adminLink(req, session),
+    publicUrl: session.mode === "anonymous" ? anonymousLink(req, session) : null,
+    participantLinks: session.mode === "anonymous" ? [] : session.participants.map((p) => ({ label: p.label, url: participantLink(req, session, p) })),
   };
 }
 function participantLink(req, session, participant) {
@@ -92,18 +110,19 @@ async function api(req, res, url) {
     const body = await readJson(req);
     const choices = normaliseChoices(body.choices);
     const count = Number(body.participantCount);
+    const mode = body.mode === "anonymous" ? "anonymous" : "individual";
     if (!choices) return fail(res, 400, "Il faut entre 2 et 7 choix.");
     if (!Number.isInteger(count) || count < 1 || count > 80) return fail(res, 400, "Le nombre de participants doit être compris entre 1 et 80.");
     const session = await mutate((store) => {
       const created = {
         id: id(), adminToken: id(), title: String(body.title || "La roue de la chance").trim().slice(0, 80) || "La roue de la chance",
-        choices, createdAt: new Date().toISOString(),
-        participants: Array.from({ length: count }, (_, index) => ({ id: id(), label: `Participant ${index + 1}`, result: null, playedAt: null })),
+        choices, mode, participantCount: count, publicToken: id(), round: 1, createdAt: new Date().toISOString(),
+        participants: mode === "anonymous" ? [] : Array.from({ length: count }, (_, index) => ({ id: id(), label: `Participant ${index + 1}`, result: null, playedAt: null })),
       };
       store.sessions[created.id] = created;
       return created;
     });
-    return send(res, 201, { session: publicSession(session), adminUrl: adminLink(req, session), participantLinks: session.participants.map((p) => ({ label: p.label, url: participantLink(req, session, p) })) });
+    return send(res, 201, { session: publicSession(session), ...sessionLinks(req, session) });
   }
 
   if (!sessionId) return fail(res, 404, "Session introuvable.");
@@ -133,15 +152,41 @@ async function api(req, res, url) {
       const current = getAdminSession(store, sessionId, url.searchParams.get("token"));
       if (!current) return null;
       current.round = (current.round || 1) + 1;
-      current.participants.forEach((participant) => {
-        participant.id = id();
-        participant.result = null;
-        participant.playedAt = null;
-      });
+      current.participants = current.mode === "anonymous" ? [] : current.participants.map((participant) => ({ ...participant, id: id(), result: null, playedAt: null }));
       return current;
     });
     if (!session) return fail(res, 403, "Accès administrateur refusé.");
-    return send(res, 200, { session: publicSession(session), adminUrl: adminLink(req, session), participantLinks: session.participants.map((p) => ({ label: p.label, url: participantLink(req, session, p) })) });
+    return send(res, 200, { session: publicSession(session), ...sessionLinks(req, session) });
+  }
+  if (req.method === "GET" && parts[3] === "public") {
+    const store = await readStore();
+    const session = store.sessions[sessionId];
+    if (!session || session.mode !== "anonymous" || url.searchParams.get("token") !== session.publicToken) return fail(res, 404, "Lien public invalide.");
+    const cookieName = anonymousCookieName(sessionId), cookies = getCookies(req), guestId = cookies[cookieName] || id();
+    const participant = session.participants.find((item) => item.id === guestId);
+    const secure = String(req.headers["x-forwarded-proto"] || "http").split(",")[0] === "https" ? "; Secure" : "";
+    return send(res, 200, { title: session.title, choices: session.choices, participant: { result: participant?.result || null, playedAt: participant?.playedAt || null }, full: !participant && session.participants.length >= session.participantCount }, { "set-cookie": `${cookieName}=${encodeURIComponent(guestId)}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Lax${secure}` });
+  }
+  if (req.method === "POST" && parts[3] === "public" && parts[4] === "spin") {
+    const cookieName = anonymousCookieName(sessionId), cookies = getCookies(req), guestId = cookies[cookieName] || id();
+    const outcome = await mutate((store) => {
+      const current = store.sessions[sessionId];
+      if (!current || current.mode !== "anonymous" || url.searchParams.get("token") !== current.publicToken) return { error: "Lien public invalide.", status: 404 };
+      let participant = current.participants.find((item) => item.id === guestId);
+      if (!participant) {
+        if (current.participants.length >= current.participantCount) return { error: "Cette manche est complète.", status: 409 };
+        participant = { id: guestId, label: `Participant anonyme ${current.participants.length + 1}`, result: null, playedAt: null };
+        current.participants.push(participant);
+      }
+      if (!participant.result) {
+        participant.result = current.choices[crypto.randomInt(current.choices.length)];
+        participant.playedAt = new Date().toISOString();
+      }
+      return { title: current.title, choices: current.choices, participant, status: 200 };
+    });
+    if (outcome.error) return fail(res, outcome.status, outcome.error);
+    const secure = String(req.headers["x-forwarded-proto"] || "http").split(",")[0] === "https" ? "; Secure" : "";
+    return send(res, 200, { title: outcome.title, choices: outcome.choices, participant: { result: outcome.participant.result, playedAt: outcome.participant.playedAt } }, { "set-cookie": `${cookieName}=${encodeURIComponent(guestId)}; Max-Age=31536000; Path=/; HttpOnly; SameSite=Lax${secure}` });
   }
   if (req.method === "GET" && parts[3] === "participant" && parts[4]) {
     const store = await readStore();
