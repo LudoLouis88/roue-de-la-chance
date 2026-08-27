@@ -129,7 +129,7 @@ async function api(req, res, url) {
   if (req.method === "GET" && parts[3] === "admin") {
     const store = await readStore();
     const session = getAdminSession(store, sessionId, url.searchParams.get("token"));
-    return session ? send(res, 200, { session: publicSession(session), adminUrl: adminLink(req, session), participantLinks: session.participants.map((p) => ({ label: p.label, url: participantLink(req, session, p) })) }) : fail(res, 403, "Accès administrateur refusé.");
+    return session ? send(res, 200, { session: publicSession(session), ...sessionLinks(req, session) }) : fail(res, 403, "Accès administrateur refusé.");
   }
   if (req.method === "PUT" && parts[3] === "admin") {
     const body = await readJson(req);
